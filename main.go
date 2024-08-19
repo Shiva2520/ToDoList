@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
-	"os/signals"
-	"strings"
+	"os/signal"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -34,7 +32,7 @@ type (
 		Completed bool          `bson:"completed"`
 		CreatedAt time.Time     `bson:"createdat"`
 	}
-	toso struct {
+	todo struct {
 		ID        string    `json:"id"`
 		Title     string    `json:"title"`
 		Completed string    `json:"completed"`
@@ -50,7 +48,36 @@ func init() {
 	db = sess.DB(dbName)
 }
 
+func homeHandler(w http.ResponseWriter,r *http.Request){
+	err := rnd.Template(w, http.StatusOK, []string{"static/home.tpl"},nil)
+	checkErr(err)
+}
+
+func fetchTodos(w http.ResponseWriter, r *http.Request){
+	todos := []todoModel{}
+
+	if err := db.C(collectionName).Find(bson.M{}).All(&todos); err != nil{
+		rnd.JSON(w, http.StatusProcessing, renderer.M{
+			"message":"Failed to fetch todo",
+			"error":err,
+		})
+		return
+	}
+	todolist := []todo{}
+
+	for _, t := range todos{
+		todolist = append(todolist, todo{
+			ID: t.ID.Hex(),
+			Title: t.Title,
+			Completed: t.Completed,
+			CreatedAt: t.CreatedAt,
+		})
+	}
+}
+
 func main() {
+	stopChan := make(chan os.Signal)
+	signal.Notify(stopChan, os.Interrupt)
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Get("/", homeHandler)
@@ -69,6 +96,14 @@ func main() {
 			log.Fatal("listen:%\n", err)
 		}
 	}()
+
+	<-stopChan
+	log.Println("shutting down server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	srv.Shutdown(ctx)
+	defer cancel(
+		log.Println("server gracefully stopped!")
+	)
 }
 
 func todoHandlers() http.Handler {
@@ -77,7 +112,7 @@ func todoHandlers() http.Handler {
 		r.Get("/", fetchTodos)
 		r.Post("/", createTodo)
 		r.Put("/{id}", updateTodo)
-		r.Delete("/{id}", deleteTodo)
+		r.Delete("/{id}", dzeleteTodo)
 	})
 	return rg
 }
