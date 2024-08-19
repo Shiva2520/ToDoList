@@ -73,6 +73,9 @@ func fetchTodos(w http.ResponseWriter, r *http.Request){
 			CreatedAt: t.CreatedAt,
 		})
 	}
+	rnd.JSON(w,http.StatusOK,renderer.M{
+		"data":todolist,
+	})
 }
 
 func main() {
