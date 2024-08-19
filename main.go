@@ -131,7 +131,11 @@ func deletetodo(w http.ResponseWriter, r *http.Request) {
 			"message": "Failed to delete",
 			"error":   err,
 		})
+		return
 	}
+	rnd.JSON(w, http.StatusCreated, renderer.M{
+		"message": "Todo deleted succcessfully",
+	})
 }
 
 func main() {
