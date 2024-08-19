@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/thedevsaddam/renderer"
+	"golang.org/x/text/message"
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -32,7 +34,7 @@ type (
 		Completed bool          `bson:"completed"`
 		CreatedAt time.Time     `bson:"createdat"`
 	}
-	todo struct {
+	todo struct { // we recieve from the user
 		ID        string    `json:"id"`
 		Title     string    `json:"title"`
 		Completed string    `json:"completed"`
@@ -75,6 +77,42 @@ func fetchTodos(w http.ResponseWriter, r *http.Request){
 	}
 	rnd.JSON(w,http.StatusOK,renderer.M{
 		"data":todolist,
+	})
+}
+
+func createTodo(w http.ResponseWriter,r *http.Request){
+	var t todo
+
+	if err := json.NewDecoder(r.Body).Decode(&t) ; err != nil{//whatever body was inside r will be copied inside t
+		rnd.JSON(w,http.StatusProcessing,err)
+		return
+	}
+
+	if t.Title == ""{
+		rnd.JSON(w,http.StatusProcessing,renderer.M{
+			"message":"The title is required",
+		})
+		return
+	}
+
+	tm := todoModel{
+		ID: bson.NewObjectId(),
+		Title: t.Title,
+		Completed: false,
+		CreatedAt: time.Now(),
+	}
+
+	if err := db.C(collectionName).Insert(&tm); err != nil{
+		rnd.JSON(w,http.StatusProcessing,renderer.M{
+			"message":"Failed to save todo",
+			"error":err,
+		})
+		return
+	}
+
+	rnd.JSON(w,http.StatusCreated,renderer.M{
+		"message":"Created Successfully",
+		"todo_id":tm.ID.Hex(),
 	})
 }
 
