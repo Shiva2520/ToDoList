@@ -138,6 +138,42 @@ func deletetodo(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func updateTodo(w http.ResponseWriter,r *http.Request){
+	id := strings.TrimSpace(chi.URLParam(r,"id"))
+
+	if !bson.IsObjectIdHex(id){
+		rnd.JSON(w,http.StatusBadRequest,renderer.M{
+			"message":"Id is invalid",
+		})
+		return
+	}
+
+	var t todo
+
+	if err := json.NewDecoder(r.Body).Decode(t); err := nil{
+		rnd.JSON(w, http.StatusProcessing, err)
+	}
+
+	if t.Title == ""{
+		rnd.JSON(w,http.StatusBadRequest, renderer.M{
+			"message":"the title field is required",
+		})
+		return
+	}
+
+	if err := db.C(collectionName).
+	Update(
+		bson.M{"id":bson.ObjectIdHex(id)},
+		bson.M{"title":t.Title,"completed":t.Completed},
+	); err != nil{
+		rnd.JSON(w,http.StatusProcessing,renderer.M{
+			"message":"Failed to update todo",
+			"error":err,
+		})
+		return
+	}
+}
+
 func main() {
 	stopChan := make(chan os.Signal)
 	signal.Notify(stopChan, os.Interrupt)
