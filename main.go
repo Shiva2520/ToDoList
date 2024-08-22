@@ -21,7 +21,7 @@ var rnd *renderer.Render
 var db *mgo.Database
 
 const (
-	hostName       string = "localhost:27017" //default prt for mongo db
+	hostName       string = "mongodb://localhost:27017/" //default port for mongo db
 	dbName         string = "demo_todo"
 	collectionName string = "todo"
 	port           string = ":9000"
@@ -32,13 +32,13 @@ type (
 		ID        bson.ObjectId `bson:"_id,omitempty"`
 		Title     string        `bson:"title"`
 		Completed bool          `bson:"completed"`
-		CreatedAt time.Time     `bson:"createdat"`
+		CreatedAt time.Time     `bson:"createdAt"`
 	}
 	todo struct { // we recieve from the user
 		ID        string    `json:"id"`
 		Title     string    `json:"title"`
 		Completed bool      `json:"completed"`
-		CreatedAt time.Time `json:"createdat"`
+		CreatedAt time.Time `json:"created_at"`
 	}
 )
 
@@ -150,7 +150,7 @@ func updateTodo(w http.ResponseWriter, r *http.Request) {
 
 	var t todo
 
-	if err := json.NewDecoder(r.Body).Decode(t); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
 		rnd.JSON(w, http.StatusProcessing, err)
 	}
 
@@ -163,7 +163,7 @@ func updateTodo(w http.ResponseWriter, r *http.Request) {
 
 	if err := db.C(collectionName).
 		Update(
-			bson.M{"id": bson.ObjectIdHex(id)},
+			bson.M{"_id": bson.ObjectIdHex(id)},
 			bson.M{"title": t.Title, "completed": t.Completed},
 		); err != nil {
 		rnd.JSON(w, http.StatusProcessing, renderer.M{
@@ -172,14 +172,19 @@ func updateTodo(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	rnd.JSON(w, http.StatusOK, renderer.M{
+		"messsage": "Todo updated successfully",
+	})
 }
 
 func main() {
 	stopChan := make(chan os.Signal)
 	signal.Notify(stopChan, os.Interrupt)
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Get("/", homeHandler)
+
 	r.Mount("/todo", todoHandlers())
 
 	srv := &http.Server{
@@ -189,10 +194,11 @@ func main() {
 		WriteTimeout: 60 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+
 	go func() { //help start our server
-		log.Println("Listening on port", port)
+		log.Println("Listening on port ", port)
 		if err := srv.ListenAndServe(); err != nil {
-			log.Fatal("listen:%\n", err)
+			log.Printf("listen: %s\n", err)
 		}
 	}()
 
